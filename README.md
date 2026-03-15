@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TradeVision
+
+Real-time AI-powered TradingView chart analyst. Screen-share your chart, and [Overshoot's](https://overshoot.ai) ultra-fast vision inference watches it continuously for patterns, breakouts, and signals. Everything it detects gets fed as live context into a Claude-powered chat, so you can ask questions about what's happening on your chart **right now** and get instant, context-aware responses.
+
+## How It Works
+
+1. **Screen Share** — Share your TradingView tab or window via the browser's screen capture API.
+2. **Vision Analysis** — Overshoot's real-time vision models (Qwen 3.5 series) continuously analyze the live feed, detecting candlestick patterns, support/resistance levels, breakouts, volume spikes, and more.
+3. **AI Chat** — All vision detections are streamed as live context into a Claude-powered chat. Ask "What's the current trend?" or "Any breakout forming?" and get answers grounded in what's actually on your screen.
+
+## Tech Stack
+
+- **Next.js 16** (App Router, React 19)
+- **Overshoot SDK** — Real-time vision inference on screen capture
+- **Anthropic Claude** — Chat with full vision context
+- **Tailwind CSS v4** — Styling
+- **Lucide React** — Icons
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Bun](https://bun.sh) (or Node.js 18+)
+- An [Overshoot API key](https://platform.overshoot.ai/api-keys) (for vision analysis)
+- An [Anthropic API key](https://console.anthropic.com/settings/keys) (for chat)
+
+### Install & Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+bun install
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser (Chrome recommended for screen capture support).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Click the **gear icon** in the top bar to open Settings and enter your API keys:
 
-## Learn More
+| Key | Purpose | Get it at |
+|-----|---------|-----------|
+| Overshoot API Key | Powers real-time vision inference on your chart | [platform.overshoot.ai](https://platform.overshoot.ai/api-keys) |
+| Anthropic API Key | Powers the Claude chat assistant | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 
-To learn more about Next.js, take a look at the following resources:
+You can also customize the **vision model** and **analysis prompt** in settings.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Vision Models
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Model | Speed | Best For |
+|-------|-------|----------|
+| Qwen 3.5 4B | Fastest | Quick scans, low latency |
+| Qwen 3.5 9B | Fast | Recommended starting point |
+| Qwen 3.5 27B | Medium | Best overall quality |
+| Qwen 3.5 35B MoE | Fast | High throughput (3B active params) |
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/
+  layout.tsx          — Root layout with scanline effect
+  page.tsx            — Main app page with topbar, controls, and layout
+  globals.css         — Theme tokens, animations, custom utilities
+components/
+  VisionFeed.tsx      — Live screen preview + signal feed
+  ChatPanel.tsx       — Claude-powered chat with vision context
+  SettingsPanel.tsx   — API keys, model selection, prompt config
+hooks/
+  useVisionAnalysis.ts — Overshoot SDK integration + screen capture
+  useChat.ts          — Anthropic API integration with vision context
+lib/
+  types.ts            — TypeScript interfaces
+  storage.ts          — LocalStorage settings persistence
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Usage Tips
+
+- **Share the right tab** — For best results, share just the TradingView browser tab (not the entire screen).
+- **Tune the prompt** — Customize the vision prompt in settings to focus on specific patterns or timeframes you care about.
+- **Watch the signal feed** — The left panel shows live detections in real-time; the chat panel lets you ask follow-up questions.
+- **Quick prompts** — Use the pre-built prompt buttons in the chat panel for common questions.
+
+## License
+
+MIT
