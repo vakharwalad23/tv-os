@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { StreamStatus } from "@/lib/types";
 import { Monitor, AlertTriangle, Wifi, WifiOff, Camera } from "lucide-react";
 import { VisionResult } from "@/lib/types";
+import { TIMEFRAME_PRESETS } from "@/hooks/useVisionAnalysis";
 
 interface Props {
     stream: MediaStream | null;
@@ -12,12 +13,12 @@ interface Props {
     lastResult: VisionResult | null;
     results: VisionResult[];
     fps: number;
-    isTradingViewDetected: boolean;
+    activeTimeframe: string | null;
     onStartCapture: () => void;
 }
 
 export default function VisionFeed({
-    stream, status, isVisionRunning, lastResult, results, fps, isTradingViewDetected, onStartCapture,
+    stream, status, isVisionRunning, lastResult, results, fps, activeTimeframe, onStartCapture,
 }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -77,9 +78,11 @@ export default function VisionFeed({
                             </div>
                             <div className="flex items-center gap-3 text-xs font-mono text-textDim">
                                 {isVisionRunning && <span className="text-accent">{fps} res/s</span>}
-                                <span className={isTradingViewDetected ? "text-accent" : "text-warn"}>
-                                    {isTradingViewDetected ? "● TradingView" : "○ Unverified source"}
-                                </span>
+                                {activeTimeframe && (
+                                    <span className="px-1.5 py-0.5 rounded border border-accent/40 bg-accentDim text-accent text-[10px] font-mono font-bold">
+                                        {TIMEFRAME_PRESETS.find(t => t.value === activeTimeframe)?.label ?? activeTimeframe}
+                                    </span>
+                                )}
                             </div>
                         </div>
                         {/* Snapshot button */}
@@ -104,7 +107,7 @@ export default function VisionFeed({
                         )}
                         <div className="text-center">
                             <p className="text-textDim text-sm mb-1">No screen selected</p>
-                            <p className="text-muted text-xs font-mono">Share your TradingView tab to begin</p>
+                            <p className="text-muted text-xs font-mono">Share a screen or tab to begin</p>
                         </div>
                         <button
                             onClick={onStartCapture}

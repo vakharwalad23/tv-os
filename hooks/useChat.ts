@@ -52,7 +52,7 @@ export function useChat() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     apiKey,
-                    system: `You are TradeVision AI, an expert trading assistant with deep knowledge of technical analysis, chart patterns, and market dynamics. You have access to real-time visual analysis of a TradingView chart being screen-shared by the user.
+                    system: `You are TradeVision AI, an expert trading assistant with deep knowledge of technical analysis, chart patterns, and market dynamics. You have access to real-time visual analysis of a live chart being screen-shared by the user.
 
 The vision AI (Overshoot) is continuously analyzing the live chart and feeding you observations. Use this context to answer the user's questions precisely and concisely.
 

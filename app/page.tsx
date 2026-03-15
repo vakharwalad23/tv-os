@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Settings, Play, Square, RefreshCw, TrendingUp, ChevronRight, BookOpen } from "lucide-react";
-import { AppSettings } from "@/lib/types";
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/storage";
-import { useVisionAnalysis } from "@/hooks/useVisionAnalysis";
+import { AppSettings, PromptTemplate } from "@/lib/types";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, PROMPT_TEMPLATES } from "@/lib/storage";
+import { useVisionAnalysis, TIMEFRAME_PRESETS } from "@/hooks/useVisionAnalysis";
 import { useChat } from "@/hooks/useChat";
 import VisionFeed from "@/components/VisionFeed";
 import ChatPanel from "@/components/ChatPanel";
@@ -12,11 +12,15 @@ import SettingsPanel from "@/components/SettingsPanel";
 import CandlePredictor from "@/components/CandlePredictor";
 import SessionStatsBar from "@/components/SessionStats";
 import SignalLog from "@/components/SignalLog";
+import SignalTimeline from "@/components/SignalTimeline";
+import PromptQuickSwitch from "@/components/PromptQuickSwitch";
+import PaperTrader from "@/components/PaperTrader";
 
 export default function Home() {
     const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
     const [showSettings, setShowSettings] = useState(false);
     const [showSignalLog, setShowSignalLog] = useState(false);
+    const [showTimeframePicker, setShowTimeframePicker] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
     const [hydrated, setHydrated] = useState(false);
 
@@ -37,10 +41,22 @@ export default function Home() {
         saveSettings(newSettings);
     }, []);
 
-    const handleStart = useCallback(async () => {
+    // Quick switch prompt template without opening settings
+    const handlePromptSwitch = useCallback((template: PromptTemplate) => {
+        const newSettings: AppSettings = {
+            ...settings,
+            promptTemplate: template,
+            visionPrompt: PROMPT_TEMPLATES[template].prompt,
+        };
+        setSettings(newSettings);
+        saveSettings(newSettings);
+    }, [settings]);
+
+    const handleStartWithTimeframe = useCallback(async (timeframe: string) => {
+        setShowTimeframePicker(false);
         setIsStarting(true);
         try {
-            await startVision(settings);
+            await startVision(settings, timeframe);
         } finally {
             setIsStarting(false);
         }
@@ -112,7 +128,7 @@ export default function Home() {
                         </button>
                     ) : (
                         <button
-                            onClick={handleStart}
+                            onClick={() => setShowTimeframePicker(true)}
                             disabled={!canStart || isStarting || needsSetup}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-bg bg-accent hover:bg-accent/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed glow-accent"
                         >
@@ -151,11 +167,18 @@ export default function Home() {
                 </div>
             )}
 
+            {/* Prompt Quick Switch bar */}
+            <PromptQuickSwitch
+                settings={settings}
+                onSwitch={handlePromptSwitch}
+                disabled={isActive}
+            />
+
             {/* Main Layout */}
             <main className="flex-1 min-h-0 flex p-4 gap-4 overflow-hidden">
-                {/* Left: Vision Feed */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden">
-                    {/* Vision feed takes remaining height */}
+                {/* Left column */}
+                <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-y-auto no-scrollbar">
+                    {/* Vision Feed */}
                     <div className="flex-1 min-h-0">
                         <VisionFeed
                             stream={visionState.stream}
@@ -164,19 +187,25 @@ export default function Home() {
                             lastResult={visionState.lastResult}
                             results={visionState.results}
                             fps={visionState.fps}
-                            isTradingViewDetected={visionState.isTradingViewDetected}
-                            onStartCapture={handleStart}
+                            activeTimeframe={visionState.activeTimeframe}
+                            onStartCapture={() => setShowTimeframePicker(true)}
                         />
                     </div>
                 </div>
 
-                {/* Right panel: Candle predictor + Chat */}
-                <div className="w-80 xl:w-96 shrink-0 flex flex-col gap-3 overflow-hidden">
+                {/* Right panel */}
+                <div className="w-80 xl:w-96 shrink-0 flex flex-col gap-3 overflow-y-auto no-scrollbar">
                     {/* Candle Predictor */}
                     <CandlePredictor visionState={visionState} />
 
+                    {/* Paper Trader */}
+                    <PaperTrader
+                        latestPrediction={visionState.latestPrediction}
+                        isRunning={isActive}
+                    />
+
                     {/* Chat */}
-                    <div className="flex-1 min-h-0">
+                    <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
                         <ChatPanel
                             messages={messages}
                             isLoading={chatLoading}
@@ -188,6 +217,9 @@ export default function Home() {
                 </div>
             </main>
 
+            {/* Signal Timeline */}
+            <SignalTimeline timeline={visionState.timeline} isRunning={isActive} />
+
             {/* Session Stats Bar */}
             <SessionStatsBar stats={visionState.sessionStats} isRunning={isActive} />
 
@@ -197,6 +229,40 @@ export default function Home() {
             )}
             {showSignalLog && (
                 <SignalLog onClose={() => setShowSignalLog(false)} />
+            )}
+
+            {/* Timeframe Picker */}
+            {showTimeframePicker && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                    <div className="bg-surface border border-border rounded-2xl p-6 w-[340px] shadow-2xl">
+                        <div className="mb-5">
+                            <h2 className="font-display font-semibold text-text text-sm tracking-tight mb-1">
+                                Select Timeframe
+                            </h2>
+                            <p className="text-xs text-muted font-mono">
+                                Which candle timeframe are you analyzing? This sets the analysis cadence and injects timeframe context into the AI prompt.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-5">
+                            {TIMEFRAME_PRESETS.map(tf => (
+                                <button
+                                    key={tf.value}
+                                    onClick={() => handleStartWithTimeframe(tf.value)}
+                                    className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl border border-border bg-bg hover:border-accent/50 hover:bg-accentDim hover:text-accent transition-colors group"
+                                >
+                                    <span className="text-sm font-mono font-bold text-text group-hover:text-accent">{tf.label}</span>
+                                    <span className="text-[10px] font-mono text-muted group-hover:text-accent/60">{tf.freqSeconds}s cadence</span>
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setShowTimeframePicker(false)}
+                            className="w-full py-2 text-xs font-mono text-muted hover:text-text border border-border rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

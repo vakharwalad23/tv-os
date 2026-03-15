@@ -1,4 +1,4 @@
-import { AppSettings, SignalLogEntry, PromptTemplate } from './types'
+import { AppSettings, SignalLogEntry, PromptTemplate, PaperTrade } from './types'
 
 const SETTINGS_KEY = 'tradevision_settings'
 const SIGNAL_LOG_KEY = 'tradevision_signal_log'
@@ -6,7 +6,7 @@ const SIGNAL_LOG_KEY = 'tradevision_signal_log'
 export const PROMPT_TEMPLATES: Record<PromptTemplate, { label: string; prompt: string }> = {
     default: {
         label: '📊 General Analysis',
-        prompt: `You are analyzing a live TradingView chart. Focus on:
+        prompt: `You are analyzing a live chart. Focus on:
 - Current price action and trend direction (bullish/bearish/sideways)
 - Key support and resistance levels visible on the chart
 - Candlestick patterns (engulfing, doji, hammer, shooting star, etc.)
@@ -20,7 +20,7 @@ Format: [SIGNAL TYPE] Description. Price level if visible.`,
     },
     candle_predictor: {
         label: '🕯️ Candle Predictor',
-        prompt: `You are analyzing a live TradingView candlestick chart. Your ONLY job is to predict the next candle direction.
+        prompt: `You are analyzing a live candlestick chart. Your ONLY job is to predict the next candle direction.
 
 Look at:
 1. The last 3-5 completed candles (size, wicks, body direction)
@@ -40,7 +40,7 @@ Do not add any other text.`,
     },
     scalping: {
         label: '⚡ Scalping Mode',
-        prompt: `You are analyzing a TradingView chart for SCALPING opportunities (very short term, 1-5 min moves).
+        prompt: `You are analyzing a chart for SCALPING opportunities (very short term, 1-5 min moves).
 
 Focus ONLY on:
 - Immediate momentum direction (last 2-3 candles)
@@ -54,7 +54,7 @@ Be extremely concise. Only fire when there's a clear setup.`,
     },
     swing: {
         label: '📈 Swing Trade Mode',
-        prompt: `You are analyzing a TradingView chart for SWING TRADE setups (holds lasting hours to days).
+        prompt: `You are analyzing a chart for SWING TRADE setups (holds lasting hours to days).
 
 Focus on:
 - Higher timeframe trend direction
@@ -68,7 +68,7 @@ Output: [SWING LONG SETUP] or [SWING SHORT SETUP] or [NO SETUP] — describe the
     },
     volume: {
         label: '📦 Volume Analysis',
-        prompt: `You are analyzing a TradingView chart with FOCUS ON VOLUME.
+        prompt: `You are analyzing a chart with FOCUS ON VOLUME.
 
 Report when you see:
 - Volume spike (>2x normal bar size)
@@ -82,7 +82,7 @@ Ignore candles with normal volume.`,
     },
     pattern_hunter: {
         label: '🔍 Pattern Hunter',
-        prompt: `You are a chart pattern specialist analyzing a TradingView chart.
+        prompt: `You are a chart pattern specialist analyzing a live chart.
 
 Identify and report ONLY these patterns when clearly visible:
 - Candlestick: Doji, Hammer, Shooting Star, Engulfing (Bull/Bear), Morning/Evening Star, Harami, Marubozu
@@ -162,4 +162,30 @@ export function exportSignalLogCSV(entries: SignalLogEntry[]): void {
     a.download = `tradevision_signals_${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+}
+// Paper trades persistence
+const PAPER_TRADES_KEY = 'tradevision_paper_trades'
+
+export function loadPaperTrades(): PaperTrade[] {
+    if (typeof window === 'undefined') return []
+    try {
+        const raw = localStorage.getItem(PAPER_TRADES_KEY)
+        if (!raw) return []
+        const parsed = JSON.parse(raw)
+        return parsed.map((t: PaperTrade) => ({
+            ...t,
+            openedAt: new Date(t.openedAt),
+            closedAt: t.closedAt ? new Date(t.closedAt) : undefined,
+        }))
+    } catch { return [] }
+}
+
+export function savePaperTrades(trades: PaperTrade[]): void {
+    if (typeof window === 'undefined') return
+    localStorage.setItem(PAPER_TRADES_KEY, JSON.stringify(trades))
+}
+
+export function clearPaperTrades(): void {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(PAPER_TRADES_KEY)
 }

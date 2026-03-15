@@ -7,7 +7,6 @@ export interface ScreenCaptureState {
     status: StreamStatus
     stream: MediaStream | null
     error: string | null
-    isTradingViewDetected: boolean
 }
 
 export function useScreenCapture() {
@@ -15,23 +14,12 @@ export function useScreenCapture() {
         status: 'idle',
         stream: null,
         error: null,
-        isTradingViewDetected: false,
     })
 
     const streamRef = useRef<MediaStream | null>(null)
     const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const videoRef = useRef<HTMLVideoElement | null>(null)
-
-    // Detect if stream contains TradingView by checking window title or content
-    const detectTradingView = useCallback((stream: MediaStream): boolean => {
-        // We use the track label — browsers often expose the tab/window title
-        const videoTrack = stream.getVideoTracks()[0]
-        if (!videoTrack) return false
-        const label = videoTrack.label.toLowerCase()
-        // Accept if the label mentions tradingview, or if it's a browser tab (users will be prompted)
-        return label.includes('tradingview') || label.includes('tab') || label.includes('chrome') || label.includes('window')
-    }, [])
 
     const startCapture = useCallback(async () => {
         setState(prev => ({ ...prev, status: 'requesting', error: null }))
@@ -47,14 +35,11 @@ export function useScreenCapture() {
                 preferCurrentTab: false,
             })
 
-            const isTradingView = detectTradingView(stream)
-
             streamRef.current = stream
             setState({
                 status: 'active',
                 stream,
                 error: null,
-                isTradingViewDetected: isTradingView,
             })
 
             // Listen for user stopping share via browser chrome
@@ -70,11 +55,10 @@ export function useScreenCapture() {
                 status: 'error',
                 stream: null,
                 error: isAborted ? 'Screen share was cancelled or denied.' : error,
-                isTradingViewDetected: false,
             })
             return null
         }
-    }, [detectTradingView])
+    }, [])
 
     const stopCapture = useCallback(() => {
         if (streamRef.current) {
@@ -84,7 +68,7 @@ export function useScreenCapture() {
         if (detectionIntervalRef.current) {
             clearInterval(detectionIntervalRef.current)
         }
-        setState({ status: 'stopped', stream: null, error: null, isTradingViewDetected: false })
+        setState({ status: 'stopped', stream: null, error: null })
     }, [])
 
     // Grab a single frame from the stream as a base64 image

@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "TradeVision — AI Chart Analysis",
   description:
-    "Real-time TradingView chart analysis powered by Overshoot AI vision inference",
+    "Real-time AI chart analysis powered by Overshoot AI vision inference",
 };
 
 export default function RootLayout({
