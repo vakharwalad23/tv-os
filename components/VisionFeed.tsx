@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { StreamStatus } from "@/lib/types";
+import { StreamStatus, VisionResult } from "@/lib/types";
 import { Monitor, AlertTriangle, Wifi, WifiOff, Camera } from "lucide-react";
-import { VisionResult } from "@/lib/types";
 import { TIMEFRAME_PRESETS } from "@/hooks/useVisionAnalysis";
 
 interface Props {
@@ -25,93 +24,107 @@ export default function VisionFeed({
     useEffect(() => {
         if (videoRef.current && stream) {
             videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(() => { });
+            videoRef.current.play().catch(() => {});
         }
     }, [stream]);
 
-    // Screenshot snapshot — saves current frame + top signal as PNG
     const handleSnapshot = useCallback(() => {
         const video = videoRef.current;
         if (!video) return;
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth || 1280;
         canvas.height = video.videoHeight || 720;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(video, 0, 0);
-
-        // Overlay watermark
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
         ctx.fillRect(0, canvas.height - 52, canvas.width, 52);
-        ctx.fillStyle = '#00ff88';
-        ctx.font = 'bold 14px IBM Plex Mono, monospace';
+        ctx.fillStyle = "#00ff88";
+        ctx.font = "bold 14px IBM Plex Mono, monospace";
         ctx.fillText(`TradeVision Snapshot — ${new Date().toLocaleString()}`, 12, canvas.height - 30);
         if (lastResult) {
-            ctx.fillStyle = '#d0d0e8';
-            ctx.font = '11px IBM Plex Mono, monospace';
+            ctx.fillStyle = "#d0d0e8";
+            ctx.font = "11px IBM Plex Mono, monospace";
             ctx.fillText(lastResult.content.slice(0, 120), 12, canvas.height - 10);
         }
-
         canvas.toBlob(blob => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            const a = document.createElement("a");
             a.href = url;
             a.download = `tradevision_${Date.now()}.png`;
             a.click();
             URL.revokeObjectURL(url);
-        }, 'image/png');
+        }, "image/png");
     }, [lastResult]);
 
+    const tfLabel = activeTimeframe
+        ? (TIMEFRAME_PRESETS.find(t => t.value === activeTimeframe)?.label ?? activeTimeframe)
+        : null;
+
     return (
-        <div className="flex flex-col h-full gap-3">
-            {/* Preview Area */}
-            <div className="relative rounded-xl border border-border overflow-hidden bg-surface shrink-0" style={{ aspectRatio: "16/9" }}>
+        // flex-1 min-h-0 ensures this fills the parent flex column without overflow
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
+
+            {/* ── Preview ──────────────────────────────────────────── */}
+            <div
+                className="relative rounded-xl border border-border bg-surface overflow-hidden shrink-0"
+                style={{ aspectRatio: "16/9" }}
+            >
                 {stream ? (
                     <>
                         <video ref={videoRef} muted className="w-full h-full object-contain bg-bg" />
-                        {/* Top HUD */}
-                        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 py-2 bg-linear-to-b from-black/60 to-transparent pointer-events-none">
+
+                        {/* HUD — top */}
+                        <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 py-2 bg-linear-to-b from-black/70 to-transparent pointer-events-none">
                             <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full live-dot ${isVisionRunning ? "bg-accent" : "bg-warn"}`} />
-                                <span className="text-xs font-mono text-text">{isVisionRunning ? "ANALYZING" : "PAUSED"}</span>
+                                <div className={`w-2 h-2 rounded-full ${isVisionRunning ? "bg-accent live-dot" : "bg-warn"}`} />
+                                <span className="text-[11px] font-mono text-white/80 font-medium">
+                                    {isVisionRunning ? "ANALYZING" : "PAUSED"}
+                                </span>
                             </div>
-                            <div className="flex items-center gap-3 text-xs font-mono text-textDim">
-                                {isVisionRunning && <span className="text-accent">{fps} res/s</span>}
-                                {activeTimeframe && (
-                                    <span className="px-1.5 py-0.5 rounded border border-accent/40 bg-accentDim text-accent text-[10px] font-mono font-bold">
-                                        {TIMEFRAME_PRESETS.find(t => t.value === activeTimeframe)?.label ?? activeTimeframe}
+                            <div className="flex items-center gap-2">
+                                {isVisionRunning && (
+                                    <span className="text-[11px] font-mono text-accent">{fps} res/s</span>
+                                )}
+                                {tfLabel && (
+                                    <span className="text-[10px] font-mono font-bold text-accent border border-accent/40 bg-accent/10 px-2 py-0.5 rounded-full">
+                                        {tfLabel}
                                     </span>
                                 )}
                             </div>
                         </div>
-                        {/* Snapshot button */}
+
+                        {/* Snapshot button — bottom right */}
                         <button
                             onClick={handleSnapshot}
                             title="Save snapshot"
-                            className="absolute bottom-2 right-2 p-1.5 bg-black/50 hover:bg-black/80 border border-white/10 rounded-lg transition-colors"
+                            className="absolute bottom-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 border border-white/10 rounded-lg transition-colors"
                         >
-                            <Camera size={13} className="text-white/70" />
+                            <Camera size={12} className="text-white/70" />
                         </button>
                     </>
                 ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 grid-bg">
-                        <div className="p-4 rounded-2xl border border-border bg-surface/80">
-                            <Monitor size={32} className="text-muted" />
+                    /* Empty state */
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg grid-bg">
+                        <div className="p-4 rounded-xl border border-border bg-surface">
+                            <Monitor size={28} className="text-muted" />
                         </div>
                         {status === "error" && (
-                            <div className="flex items-center gap-2 text-danger text-xs font-mono">
-                                <AlertTriangle size={12} />
+                            <div className="flex items-center gap-1.5 text-danger text-xs font-mono">
+                                <AlertTriangle size={11} />
                                 Screen share was denied or cancelled
                             </div>
                         )}
                         <div className="text-center">
-                            <p className="text-textDim text-sm mb-1">No screen selected</p>
-                            <p className="text-muted text-xs font-mono">Share a screen or tab to begin</p>
+                            <p className="text-textDim text-sm font-medium mb-1">No screen selected</p>
+                            <p className="text-muted text-[11px] font-mono max-w-[220px]">
+                                Click Start, pick a timeframe, then share your chart tab
+                            </p>
                         </div>
                         <button
                             onClick={onStartCapture}
-                            className="px-5 py-2.5 bg-accent text-bg text-sm font-mono font-medium rounded-lg hover:bg-accent/90 transition-colors glow-accent"
+                            className="px-4 py-2 bg-accent text-bg text-xs font-mono font-semibold rounded-lg hover:bg-accent/90 transition-colors"
                         >
                             Select Screen / Tab
                         </button>
@@ -119,42 +132,58 @@ export default function VisionFeed({
                 )}
             </div>
 
-            {/* Live Signal Feed */}
+            {/* ── Live Signal Feed ─────────────────────────────────── */}
             <div className="flex-1 min-h-0 rounded-xl border border-border bg-surface overflow-hidden flex flex-col">
+                {/* Header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
                     <div className="flex items-center gap-2">
-                        {isVisionRunning ? <Wifi size={12} className="text-accent" /> : <WifiOff size={12} className="text-muted" />}
-                        <span className="text-xs font-mono uppercase tracking-widest text-textDim">Live Signals</span>
+                        {isVisionRunning
+                            ? <Wifi size={11} className="text-accent" />
+                            : <WifiOff size={11} className="text-muted" />
+                        }
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-muted">
+                            Live Signals
+                        </span>
                     </div>
-                    <span className="text-xs font-mono text-muted">{results.length} captured</span>
+                    {results.length > 0 && (
+                        <span className="text-[10px] font-mono text-muted">{results.length} captured</span>
+                    )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {/* Feed */}
+                <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
                     {results.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                            <p className="text-textDim text-xs font-mono">Signals will appear here in real-time</p>
-                            <p className="text-muted text-xs mt-1">as Overshoot analyzes your chart</p>
+                        <div className="flex flex-col items-center justify-center h-full gap-1.5 py-8 text-center">
+                            <p className="text-muted text-xs font-mono">No signals yet</p>
+                            <p className="text-muted/50 text-[11px] font-mono">
+                                {isVisionRunning ? "Waiting for analysis…" : "Start a session to see signals"}
+                            </p>
                         </div>
                     ) : (
                         results.map((r, i) => (
-                            <div key={r.id} className={`rounded-lg px-3 py-2.5 border transition-all ${
-                                i === 0 ? "border-accent/30 bg-accentDim msg-in" : "border-border/50 bg-bg/50"
-                            }`}>
+                            <div
+                                key={r.id}
+                                className={`rounded-lg px-3 py-2 border transition-all ${
+                                    i === 0
+                                        ? "border-accent/25 bg-accentDim msg-in"
+                                        : "border-border/40 bg-bg/40"
+                                }`}
+                            >
                                 <div className="flex items-center justify-between mb-1 gap-2">
-                                    <span className={`text-xs font-mono shrink-0 ${i === 0 ? "text-accent" : "text-muted"}`}>
+                                    <span className={`text-[10px] font-mono shrink-0 ${i === 0 ? "text-accent" : "text-muted"}`}>
                                         {i === 0 ? "▶ NOW" : formatTime(r.timestamp)}
                                     </span>
                                     {r.prediction && (
-                                        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
-                                            r.prediction === 'GREEN'
-                                                ? 'bg-green-500/15 text-green-400'
-                                                : 'bg-red-500/15 text-red-400'
+                                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                            r.prediction === "GREEN"
+                                                ? "bg-green-500/15 text-green-400"
+                                                : "bg-red-500/15 text-red-400"
                                         }`}>
-                                            {r.prediction === 'GREEN' ? '▲' : '▼'} {r.prediction} {r.predictionConfidence}%
+                                            {r.prediction === "GREEN" ? "▲" : "▼"} {r.prediction} {r.predictionConfidence}%
                                         </span>
                                     )}
                                     {r.signalType && !r.prediction && (
-                                        <span className="text-xs font-mono text-accent/70 shrink-0">[{r.signalType}]</span>
+                                        <span className="text-[10px] font-mono text-accent/60 shrink-0">[{r.signalType}]</span>
                                     )}
                                 </div>
                                 <p className="text-xs text-text leading-relaxed">{r.content}</p>

@@ -41,7 +41,6 @@ export default function Home() {
         saveSettings(newSettings);
     }, []);
 
-    // Quick switch prompt template without opening settings
     const handlePromptSwitch = useCallback((template: PromptTemplate) => {
         const newSettings: AppSettings = {
             ...settings,
@@ -77,76 +76,91 @@ export default function Home() {
     if (!hydrated) return null;
 
     return (
-        <div className="flex flex-col h-screen bg-bg grid-bg overflow-hidden">
-            {/* Topbar */}
-            <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface/80 backdrop-blur-sm shrink-0 z-10">
+        <div className="flex flex-col h-screen bg-bg overflow-hidden">
+
+            {/* ── Topbar ─────────────────────────────────────────────── */}
+            <header className="flex items-center justify-between px-5 h-12 border-b border-border bg-surface shrink-0 z-20">
+                {/* Logo */}
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-accentDim border border-accent/30 flex items-center justify-center">
-                            <TrendingUp size={14} className="text-accent" />
+                        <div className="w-6 h-6 rounded-lg bg-accentDim border border-accent/30 flex items-center justify-center">
+                            <TrendingUp size={13} className="text-accent" />
                         </div>
                         <span className="font-display font-semibold text-text text-sm tracking-tight">
                             Trade<span className="text-accent">Vision</span>
                         </span>
                     </div>
-                    <span className="text-xs text-muted font-mono hidden sm:block">/ Real-time chart intelligence</span>
+                    <div className="hidden sm:flex items-center gap-2.5">
+                        <div className="w-px h-3.5 bg-border" />
+                        <span className="text-[11px] text-muted font-mono">Real-time AI chart analysis</span>
+                    </div>
                 </div>
 
+                {/* Controls */}
                 <div className="flex items-center gap-2">
                     {/* Status pill */}
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono border ${
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono border ${
                         isActive
                             ? "border-accent/40 bg-accentDim text-accent"
                             : visionState.status === "requesting" || isStarting
                             ? "border-warn/40 bg-warn/10 text-warn"
                             : "border-border text-muted"
                     }`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                            isActive ? "bg-accent live-dot" : visionState.status === "requesting" ? "bg-warn animate-pulse" : "bg-muted"
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            isActive ? "bg-accent live-dot"
+                            : visionState.status === "requesting" || isStarting ? "bg-warn animate-pulse"
+                            : "bg-muted"
                         }`} />
-                        {isActive ? "LIVE" : isStarting ? "CONNECTING" : "OFFLINE"}
+                        {isActive ? "LIVE" : isStarting ? "CONNECTING" : "IDLE"}
                     </div>
 
-                    {/* Signal Log */}
+                    <div className="hidden sm:block w-px h-5 bg-border" />
+
+                    {/* Signal log */}
                     <button
                         onClick={() => setShowSignalLog(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-textDim border border-border hover:border-muted hover:text-text rounded-lg transition-colors"
-                        title="Signal Log"
+                        className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono text-muted hover:text-textDim border border-border hover:border-muted rounded-md transition-colors"
                     >
-                        <BookOpen size={12} />
-                        <span className="hidden sm:inline">Log</span>
+                        <BookOpen size={11} />
+                        Log
                     </button>
 
                     {/* Start / Stop */}
                     {isActive ? (
                         <button
                             onClick={handleStop}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-danger border border-danger/30 bg-danger/5 hover:bg-danger/10 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-danger border border-danger/30 bg-danger/5 hover:bg-danger/10 rounded-md transition-colors"
                         >
-                            <Square size={11} fill="currentColor" />
+                            <Square size={10} fill="currentColor" />
                             Stop
                         </button>
                     ) : (
                         <button
                             onClick={() => setShowTimeframePicker(true)}
                             disabled={!canStart || isStarting || needsSetup}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-bg bg-accent hover:bg-accent/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed glow-accent"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium text-bg bg-accent hover:bg-accent/90 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            <Play size={11} fill="currentColor" />
-                            {isStarting ? "Starting..." : "Start"}
+                            <Play size={10} fill="currentColor" />
+                            {isStarting ? "Starting…" : "Start"}
                         </button>
                     )}
 
                     {visionState.status === "active" && !visionState.isRunning && (
-                        <button onClick={clearResults} className="p-1.5 hover:bg-border rounded-lg transition-colors" title="Clear results">
-                            <RefreshCw size={13} className="text-muted" />
+                        <button
+                            onClick={clearResults}
+                            className="p-1.5 text-muted hover:text-textDim hover:bg-border/60 rounded-md transition-colors"
+                            title="Clear results"
+                        >
+                            <RefreshCw size={13} />
                         </button>
                     )}
 
                     <button
                         onClick={() => setShowSettings(true)}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                            needsSetup ? "bg-warn/20 border border-warn/40 text-warn" : "hover:bg-border text-muted hover:text-textDim"
+                        className={`p-1.5 rounded-md transition-colors ${
+                            needsSetup
+                                ? "text-warn bg-warn/10 border border-warn/30"
+                                : "text-muted hover:text-textDim hover:bg-border/60"
                         }`}
                         title="Settings"
                     >
@@ -155,57 +169,52 @@ export default function Home() {
                 </div>
             </header>
 
-            {/* Setup Banner */}
+            {/* ── Setup banner ───────────────────────────────────────── */}
             {needsSetup && (
                 <div
-                    className="flex items-center gap-3 px-5 py-2.5 bg-warn/10 border-b border-warn/20 cursor-pointer hover:bg-warn/15 transition-colors"
+                    className="flex items-center gap-2.5 px-5 py-2 bg-warn/5 border-b border-warn/20 cursor-pointer hover:bg-warn/8 transition-colors shrink-0"
                     onClick={() => setShowSettings(true)}
                 >
-                    <span className="text-xs font-mono text-warn">⚠ Setup required:</span>
-                    <span className="text-xs text-textDim">Add your Overshoot API key to enable vision analysis</span>
-                    <ChevronRight size={12} className="text-muted ml-auto" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-warn shrink-0" />
+                    <span className="text-[11px] font-mono text-warn font-medium">Setup required</span>
+                    <span className="text-[11px] text-muted">— Add your Overshoot API key to begin</span>
+                    <ChevronRight size={11} className="text-warn ml-auto" />
                 </div>
             )}
 
-            {/* Prompt Quick Switch bar */}
+            {/* ── Mode bar ───────────────────────────────────────────── */}
             <PromptQuickSwitch
                 settings={settings}
                 onSwitch={handlePromptSwitch}
                 disabled={isActive}
             />
 
-            {/* Main Layout */}
-            <main className="flex-1 min-h-0 flex p-4 gap-4 overflow-hidden">
-                {/* Left column */}
-                <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-y-auto no-scrollbar">
-                    {/* Vision Feed */}
-                    <div className="flex-1 min-h-0">
-                        <VisionFeed
-                            stream={visionState.stream}
-                            status={visionState.status}
-                            isVisionRunning={visionState.isRunning}
-                            lastResult={visionState.lastResult}
-                            results={visionState.results}
-                            fps={visionState.fps}
-                            activeTimeframe={visionState.activeTimeframe}
-                            onStartCapture={() => setShowTimeframePicker(true)}
-                        />
-                    </div>
+            {/* ── Main layout ────────────────────────────────────────── */}
+            {/* Left column has overflow-hidden so VisionFeed can fill height and scroll internally */}
+            <main className="flex-1 min-h-0 flex gap-3 p-3 overflow-hidden">
+
+                {/* Left — VisionFeed fills all available height */}
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+                    <VisionFeed
+                        stream={visionState.stream}
+                        status={visionState.status}
+                        isVisionRunning={visionState.isRunning}
+                        lastResult={visionState.lastResult}
+                        results={visionState.results}
+                        fps={visionState.fps}
+                        activeTimeframe={visionState.activeTimeframe}
+                        onStartCapture={() => setShowTimeframePicker(true)}
+                    />
                 </div>
 
-                {/* Right panel */}
-                <div className="w-80 xl:w-96 shrink-0 flex flex-col gap-3 overflow-y-auto no-scrollbar">
-                    {/* Candle Predictor */}
+                {/* Right — scrollable card stack */}
+                <div className="w-[308px] xl:w-[344px] shrink-0 flex flex-col gap-3 overflow-y-auto no-scrollbar">
                     <CandlePredictor visionState={visionState} />
-
-                    {/* Paper Trader */}
                     <PaperTrader
                         latestPrediction={visionState.latestPrediction}
                         isRunning={isActive}
                     />
-
-                    {/* Chat */}
-                    <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
+                    <div className="flex-1 min-h-0" style={{ minHeight: "280px" }}>
                         <ChatPanel
                             messages={messages}
                             isLoading={chatLoading}
@@ -217,50 +226,59 @@ export default function Home() {
                 </div>
             </main>
 
-            {/* Signal Timeline */}
+            {/* ── Bottom bars ────────────────────────────────────────── */}
             <SignalTimeline timeline={visionState.timeline} isRunning={isActive} />
-
-            {/* Session Stats Bar */}
             <SessionStatsBar stats={visionState.sessionStats} isRunning={isActive} />
 
-            {/* Modals */}
+            {/* ── Modals ─────────────────────────────────────────────── */}
             {showSettings && (
-                <SettingsPanel settings={settings} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />
+                <SettingsPanel
+                    settings={settings}
+                    onSave={handleSaveSettings}
+                    onClose={() => setShowSettings(false)}
+                />
             )}
             {showSignalLog && (
                 <SignalLog onClose={() => setShowSignalLog(false)} />
             )}
 
-            {/* Timeframe Picker */}
+            {/* ── Timeframe picker ───────────────────────────────────── */}
             {showTimeframePicker && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-                    <div className="bg-surface border border-border rounded-2xl p-6 w-[340px] shadow-2xl">
-                        <div className="mb-5">
-                            <h2 className="font-display font-semibold text-text text-sm tracking-tight mb-1">
-                                Select Timeframe
-                            </h2>
-                            <p className="text-xs text-muted font-mono">
-                                Which candle timeframe are you analyzing? This sets the analysis cadence and injects timeframe context into the AI prompt.
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm">
+                    <div className="bg-surface border border-border rounded-xl w-[380px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7)]">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-border">
+                            <h2 className="font-display font-semibold text-text text-sm">Select Timeframe</h2>
+                            <p className="text-[11px] text-muted font-mono mt-0.5">
+                                Sets analysis cadence · injects candle context into the AI prompt
                             </p>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 mb-5">
+                        {/* 3-col grid — gap-px creates hairline separators without double borders */}
+                        <div className="grid grid-cols-3 gap-px bg-border">
                             {TIMEFRAME_PRESETS.map(tf => (
                                 <button
                                     key={tf.value}
                                     onClick={() => handleStartWithTimeframe(tf.value)}
-                                    className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl border border-border bg-bg hover:border-accent/50 hover:bg-accentDim hover:text-accent transition-colors group"
+                                    className="flex flex-col items-center gap-1 py-5 bg-surface hover:bg-bg transition-colors group"
                                 >
-                                    <span className="text-sm font-mono font-bold text-text group-hover:text-accent">{tf.label}</span>
-                                    <span className="text-[10px] font-mono text-muted group-hover:text-accent/60">{tf.freqSeconds}s cadence</span>
+                                    <span className="text-base font-mono font-bold text-text group-hover:text-accent transition-colors">
+                                        {tf.label}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-muted group-hover:text-accent/50 transition-colors">
+                                        every {tf.freqSeconds}s
+                                    </span>
                                 </button>
                             ))}
                         </div>
-                        <button
-                            onClick={() => setShowTimeframePicker(false)}
-                            className="w-full py-2 text-xs font-mono text-muted hover:text-text border border-border rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
+                        {/* Footer */}
+                        <div className="px-5 py-3 border-t border-border">
+                            <button
+                                onClick={() => setShowTimeframePicker(false)}
+                                className="w-full py-2 text-xs font-mono text-muted hover:text-textDim rounded-md hover:bg-border/60 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
