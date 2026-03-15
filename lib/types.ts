@@ -11,6 +11,29 @@ export interface VisionResult {
     content: string
     timestamp: Date
     confidence?: number
+    // parsed fields from structured prompt output
+    prediction?: 'GREEN' | 'RED' | null
+    predictionConfidence?: number
+    predictionReason?: string
+    signalType?: string
+}
+
+export interface SignalLogEntry {
+    id: string
+    timestamp: Date
+    content: string
+    prediction?: 'GREEN' | 'RED' | null
+    predictionConfidence?: number
+    signalType?: string
+}
+
+export interface SessionStats {
+    totalSignals: number
+    bullishCount: number
+    bearishCount: number
+    greenPredictions: number
+    redPredictions: number
+    startTime: Date | null
 }
 
 export interface AppSettings {
@@ -19,7 +42,12 @@ export interface AppSettings {
     visionPrompt: string
     model: string
     processingMode: 'frame' | 'clip'
-    analysisFrequency: number // seconds between forced snapshots
+    analysisFrequency: number
+    audioAlertsEnabled: boolean
+    alertKeywords: string // comma separated
+    promptTemplate: string // which preset is active
 }
 
 export type StreamStatus = 'idle' | 'requesting' | 'active' | 'error' | 'stopped'
+
+export type PromptTemplate = 'default' | 'scalping' | 'swing' | 'candle_predictor' | 'volume' | 'pattern_hunter'

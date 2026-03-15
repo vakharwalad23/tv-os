@@ -17,7 +17,10 @@ const QUICK_PROMPTS = [
   "Any breakout patterns?",
   "Key support/resistance?",
   "What's the RSI telling us?",
-  "Should I be cautious here?",
+  "Explain the last signal",
+  "Is this a good entry?",
+  "What's the overall bias?",
+  "Any warning signs?",
 ];
 
 export default function ChatPanel({

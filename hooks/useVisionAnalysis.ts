@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { VisionResult, AppSettings, StreamStatus } from '@/lib/types'
+import { VisionResult, AppSettings, StreamStatus, SessionStats } from '@/lib/types'
+import { appendSignalLog } from '@/lib/storage'
 
 export interface VisionState {
     isRunning: boolean
@@ -12,6 +13,58 @@ export interface VisionState {
     stream: MediaStream | null
     status: StreamStatus
     isTradingViewDetected: boolean
+    sessionStats: SessionStats
+    // latest parsed candle prediction
+    latestPrediction: { direction: 'GREEN' | 'RED' | null; confidence: number; reason: string } | null
+    // candle streak
+    candleStreak: { color: 'GREEN' | 'RED'; count: number } | null
+}
+
+const INITIAL_STATS: SessionStats = {
+    totalSignals: 0,
+    bullishCount: 0,
+    bearishCount: 0,
+    greenPredictions: 0,
+    redPredictions: 0,
+    startTime: null,
+}
+
+// Parse Overshoot result text for structured data
+function parseResult(raw: string): Partial<VisionResult> {
+    const out: Partial<VisionResult> = {}
+
+    // Parse candle prediction: "PREDICTION: GREEN | confidence: 72% | reason: bullish engulfing"
+    const predMatch = raw.match(/PREDICTION:\s*(GREEN|RED)\s*\|?\s*confidence:\s*(\d+)%?\s*\|?\s*reason:\s*(.+)/i)
+    if (predMatch) {
+        out.prediction = predMatch[1].toUpperCase() as 'GREEN' | 'RED'
+        out.predictionConfidence = parseInt(predMatch[2])
+        out.predictionReason = predMatch[3].trim()
+    }
+
+    // Parse signal type from [SIGNAL TYPE] prefix
+    const signalMatch = raw.match(/^\[([^\]]+)\]/)
+    if (signalMatch) {
+        out.signalType = signalMatch[1].trim()
+    }
+
+    return out
+}
+
+// Play a beep using Web Audio API — no deps
+function playAlert(type: 'signal' | 'prediction') {
+    try {
+        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.frequency.value = type === 'prediction' ? 880 : 660
+        osc.type = 'sine'
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.4)
+    } catch { }
 }
 
 export function useVisionAnalysis() {
@@ -24,14 +77,22 @@ export function useVisionAnalysis() {
         stream: null,
         status: 'idle',
         isTradingViewDetected: false,
+        sessionStats: INITIAL_STATS,
+        latestPrediction: null,
+        candleStreak: null,
     })
 
     const visionRef = useRef<unknown>(null)
     const resultCountRef = useRef(0)
     const fpsTimerRef = useRef<NodeJS.Timeout | null>(null)
     const lastFpsCountRef = useRef(0)
+    const settingsRef = useRef<AppSettings | null>(null)
+    // track streak locally
+    const streakRef = useRef<{ color: 'GREEN' | 'RED'; count: number } | null>(null)
 
     const startVision = useCallback(async (settings: AppSettings) => {
+        settingsRef.current = settings
+
         if (!settings.overshootApiKey) {
             setState(prev => ({ ...prev, error: 'Overshoot API key is required.' }))
             return
@@ -39,12 +100,10 @@ export function useVisionAnalysis() {
 
         setState(prev => ({ ...prev, status: 'requesting', error: null }))
 
-        // Pre-flight: verify getDisplayMedia is available
         if (!navigator.mediaDevices?.getDisplayMedia) {
-            console.error('getDisplayMedia not available. navigator.mediaDevices:', navigator.mediaDevices)
             setState(prev => ({
                 ...prev,
-                error: 'Screen sharing is not supported. Use Chrome/Edge on desktop with HTTPS or localhost.',
+                error: 'Screen sharing not supported. Use Chrome/Edge on desktop.',
                 status: 'error',
             }))
             return
@@ -69,18 +128,78 @@ export function useVisionAnalysis() {
                         setState(prev => ({ ...prev, error: raw.error ?? 'Inference failed' }))
                         return
                     }
+
                     resultCountRef.current += 1
+                    const parsed = parseResult(raw.result)
+
                     const result: VisionResult = {
                         id: crypto.randomUUID(),
                         content: raw.result,
                         timestamp: new Date(),
+                        ...parsed,
                     }
-                    setState(prev => ({
-                        ...prev,
-                        results: [result, ...prev.results].slice(0, 100),
-                        lastResult: result,
-                        error: null,
-                    }))
+
+                    // Update candle streak
+                    let newStreak = streakRef.current
+                    if (parsed.prediction) {
+                        if (newStreak && newStreak.color === parsed.prediction) {
+                            newStreak = { color: parsed.prediction, count: newStreak.count + 1 }
+                        } else {
+                            newStreak = { color: parsed.prediction, count: 1 }
+                        }
+                        streakRef.current = newStreak
+                    }
+
+                    // Audio alert
+                    const s = settingsRef.current
+                    if (s?.audioAlertsEnabled) {
+                        if (parsed.prediction) {
+                            playAlert('prediction')
+                        } else {
+                            const keywords = s.alertKeywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean)
+                            const lower = raw.result.toLowerCase()
+                            if (keywords.some(k => lower.includes(k))) {
+                                playAlert('signal')
+                            }
+                        }
+                    }
+
+                    // Persist to signal log
+                    appendSignalLog({
+                        id: result.id,
+                        timestamp: result.timestamp,
+                        content: result.content,
+                        prediction: result.prediction,
+                        predictionConfidence: result.predictionConfidence,
+                        signalType: result.signalType,
+                    })
+
+                    setState(prev => {
+                        const lower = raw.result.toLowerCase()
+                        const isBullish = lower.includes('bullish') || lower.includes('green') || lower.includes('long') || lower.includes('breakout')
+                        const isBearish = lower.includes('bearish') || lower.includes('red') || lower.includes('short') || lower.includes('breakdown')
+
+                        return {
+                            ...prev,
+                            results: [result, ...prev.results].slice(0, 200),
+                            lastResult: result,
+                            error: null,
+                            latestPrediction: parsed.prediction ? {
+                                direction: parsed.prediction,
+                                confidence: parsed.predictionConfidence ?? 50,
+                                reason: parsed.predictionReason ?? '',
+                            } : prev.latestPrediction,
+                            candleStreak: newStreak,
+                            sessionStats: {
+                                ...prev.sessionStats,
+                                totalSignals: prev.sessionStats.totalSignals + 1,
+                                bullishCount: prev.sessionStats.bullishCount + (isBullish ? 1 : 0),
+                                bearishCount: prev.sessionStats.bearishCount + (isBearish ? 1 : 0),
+                                greenPredictions: prev.sessionStats.greenPredictions + (parsed.prediction === 'GREEN' ? 1 : 0),
+                                redPredictions: prev.sessionStats.redPredictions + (parsed.prediction === 'RED' ? 1 : 0),
+                            }
+                        }
+                    })
                 },
                 onError: (err: Error) => {
                     setState(prev => ({ ...prev, error: err.message, isRunning: false, status: 'error' }))
@@ -90,7 +209,6 @@ export function useVisionAnalysis() {
             visionRef.current = vision
             await vision.start()
 
-            // Get the MediaStream from the SDK for preview display
             let mediaStream: MediaStream | null = null
             let isTradingView = false
             try {
@@ -100,7 +218,7 @@ export function useVisionAnalysis() {
                     isTradingView = label.includes('tradingview') || label.includes('tab') || label.includes('chrome') || label.includes('window')
                 }
             } catch (e) {
-                console.warn('getMediaStream not available on this SDK version:', e)
+                console.warn('getMediaStream not available:', e)
             }
 
             setState(prev => ({
@@ -110,9 +228,9 @@ export function useVisionAnalysis() {
                 status: 'active',
                 stream: mediaStream,
                 isTradingViewDetected: isTradingView,
+                sessionStats: { ...INITIAL_STATS, startTime: new Date() },
             }))
 
-            // FPS tracking
             resultCountRef.current = 0
             lastFpsCountRef.current = 0
             fpsTimerRef.current = setInterval(() => {
@@ -120,8 +238,8 @@ export function useVisionAnalysis() {
                 lastFpsCountRef.current = resultCountRef.current
                 setState(prev => ({ ...prev, fps: delta }))
             }, 1000)
+
         } catch (err) {
-            console.error('Vision start failed:', err)
             const msg = err instanceof Error ? err.message : 'Vision analysis failed to start'
             const isAborted = msg.includes('Permission denied') || msg.includes('NotAllowedError')
             setState(prev => ({
@@ -135,17 +253,26 @@ export function useVisionAnalysis() {
 
     const stopVision = useCallback(async () => {
         if (visionRef.current) {
-            try {
-                await (visionRef.current as { stop: () => Promise<void> }).stop()
-            } catch { }
+            try { await (visionRef.current as { stop: () => Promise<void> }).stop() } catch { }
             visionRef.current = null
         }
         if (fpsTimerRef.current) clearInterval(fpsTimerRef.current)
-        setState(prev => ({ ...prev, isRunning: false, fps: 0, stream: null, status: 'stopped', isTradingViewDetected: false }))
+        streakRef.current = null
+        setState(prev => ({
+            ...prev,
+            isRunning: false,
+            fps: 0,
+            stream: null,
+            status: 'stopped',
+            isTradingViewDetected: false,
+            latestPrediction: null,
+            candleStreak: null,
+        }))
     }, [])
 
     const clearResults = useCallback(() => {
-        setState(prev => ({ ...prev, results: [], lastResult: null }))
+        setState(prev => ({ ...prev, results: [], lastResult: null, sessionStats: INITIAL_STATS, latestPrediction: null, candleStreak: null }))
+        streakRef.current = null
     }, [])
 
     return { state, startVision, stopVision, clearResults }
