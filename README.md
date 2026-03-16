@@ -15,16 +15,20 @@ Real-time AI chart analyst. Screen-share any chart, pick your timeframe, and [Ov
 
 ## Timeframe → Analysis Cadence
 
-When you select a timeframe, TradeVision sets the Overshoot `interval_seconds` to a value tuned for that candle size — frequent enough to catch meaningful changes, conservative enough not to burn API credits on redundant frames.
+The Overshoot SDK enforces a hard maximum of **60 seconds** for its capture interval. For slower timeframes (15m → 1D) TradeVision uses a **result gate**: the SDK captures and runs inference every 60 s, but only the result that arrives once the real target interval has elapsed is forwarded to the UI. Intermediate inferences are silently dropped.
 
-| Timeframe | Candle Duration | Analysis Every | Analyses / Candle |
-|-----------|----------------|----------------|-------------------|
-| **1m**    | 60s            | 20s            | ~3                |
-| **5m**    | 5 min          | 60s            | ~5                |
-| **15m**   | 15 min         | 120s (2 min)   | ~7                |
-| **1H**    | 1 hour         | 300s (5 min)   | ~12               |
-| **4H**    | 4 hours        | 600s (10 min)  | ~24               |
-| **1D**    | 1 day          | 900s (15 min)  | ~96               |
+| Timeframe | Candle Duration | SDK Capture Rate | Result shown every | Results / Candle |
+|-----------|----------------|------------------|--------------------|-----------------|
+| **1m**    | 60 s           | 20 s             | **20 s**           | ~3              |
+| **5m**    | 5 min          | 60 s             | **60 s**           | ~5              |
+| **15m**   | 15 min         | 60 s ¹           | **120 s (2 min)**  | ~7              |
+| **1H**    | 1 hour         | 60 s ¹           | **300 s (5 min)**  | ~12             |
+| **4H**    | 4 hours        | 60 s ¹           | **600 s (10 min)** | ~24             |
+| **1D**    | 1 day          | 60 s ¹           | **900 s (15 min)** | ~96             |
+
+¹ SDK capped at 60 s max; result gate suppresses output until the full target interval elapses.
+
+> **API cost note:** For 15m–1D sessions the SDK still runs inference every 60 s internally. Only 1-in-N results reach the UI, but all N inferences are billed. If cost is a concern, use the **Default Frame Interval** slider in Settings to raise the SDK interval toward 60 s (it is already at the ceiling for 5m–1D).
 
 The active timeframe is shown as a badge in the live feed HUD so it's always visible while a session is running.
 
@@ -39,7 +43,7 @@ The active timeframe is shown as a badge in the live feed HUD so it's always vis
 - **Session stats** — Bullish/bearish signal counts, prediction accuracy breakdown, and session uptime tracked in real-time at the bottom bar.
 
 ### Prompt Templates
-Six built-in AI vision prompts accessible via the quick-switch bar — switch without opening settings:
+Seven built-in AI vision prompts accessible via the quick-switch bar — switch without opening settings:
 
 | Template | Focus |
 |----------|-------|
@@ -49,6 +53,7 @@ Six built-in AI vision prompts accessible via the quick-switch bar — switch wi
 | 📈 Swing Trade Mode | Chart patterns, higher-TF trend, MA alignment |
 | 📦 Volume Analysis | Volume spikes, absorption, distribution, divergence |
 | 🔍 Pattern Hunter | Named candlestick + chart patterns with confidence |
+| 🔤 Read Chart Text | OCR — transcribes every visible price, indicator value, and label (auto-selects Qwen 3.5 2B) |
 
 ### Candle Predictor
 Dedicated panel that parses structured `PREDICTION: GREEN/RED | confidence: X% | reason: ...` output from the AI. Shows the latest directional call, confidence bar, and a running streak counter.

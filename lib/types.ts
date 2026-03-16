@@ -43,6 +43,7 @@ export interface AppSettings {
     model: string
     processingMode: 'frame' | 'clip'
     analysisFrequency: number
+    maxOutputTokens: number
     audioAlertsEnabled: boolean
     alertKeywords: string // comma separated
     promptTemplate: string // which preset is active
@@ -50,7 +51,7 @@ export interface AppSettings {
 
 export type StreamStatus = 'idle' | 'requesting' | 'active' | 'error' | 'stopped'
 
-export type PromptTemplate = 'default' | 'scalping' | 'swing' | 'candle_predictor' | 'volume' | 'pattern_hunter'
+export type PromptTemplate = 'default' | 'scalping' | 'swing' | 'candle_predictor' | 'volume' | 'pattern_hunter' | 'chart_text'
 export interface PaperTrade {
     id: string
     openedAt: Date

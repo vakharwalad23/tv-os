@@ -11,11 +11,37 @@ interface Props {
     onClose: () => void;
 }
 
-const MODELS = [
-    { value: "Qwen/Qwen3.5-4B",     label: "Qwen 3.5 4B",  note: "Fastest"         },
-    { value: "Qwen/Qwen3.5-9B",     label: "Qwen 3.5 9B",  note: "Recommended"     },
-    { value: "Qwen/Qwen3.5-27B",    label: "Qwen 3.5 27B", note: "Best Quality"    },
-    { value: "Qwen/Qwen3.5-35B-A3B",label: "Qwen 3.5 35B", note: "High Throughput" },
+type ModelGroup = { group: string; models: { value: string; label: string; note: string }[] }
+
+const MODEL_GROUPS: ModelGroup[] = [
+    {
+        group: 'Large (27B+)',
+        models: [
+            { value: 'Qwen/Qwen3.5-27B',              label: 'Qwen 3.5 27B',       note: 'Best overall'      },
+            { value: 'Qwen/Qwen3.5-35B-A3B',           label: 'Qwen 3.5 35B (MoE)', note: 'High throughput'   },
+            { value: 'Qwen/Qwen3-VL-32B-Instruct-FP8', label: 'Qwen3-VL 32B FP8',  note: ''                  },
+            { value: 'Qwen/Qwen3-VL-30B-A3B-Instruct', label: 'Qwen3-VL 30B (MoE)', note: ''                 },
+            { value: 'OpenGVLab/InternVL3_5-30B-A3B',  label: 'InternVL3.5 30B',    note: ''                  },
+        ],
+    },
+    {
+        group: 'Medium (8–9B)',
+        models: [
+            { value: 'Qwen/Qwen3.5-9B',          label: 'Qwen 3.5 9B',     note: 'Recommended'    },
+            { value: 'Qwen/Qwen3-VL-8B-Instruct', label: 'Qwen3-VL 8B',    note: ''               },
+            { value: 'allenai/Molmo2-8B',          label: 'Molmo2 8B',      note: ''               },
+            { value: 'Kwai-Keye/Keye-VL-1_5-8B',  label: 'Keye-VL 8B',     note: ''               },
+            { value: 'openbmb/MiniCPM-V-4_5',     label: 'MiniCPM-V 4.5',  note: ''               },
+        ],
+    },
+    {
+        group: 'Small (2–4B)',
+        models: [
+            { value: 'Qwen/Qwen3.5-4B',           label: 'Qwen 3.5 4B',    note: 'Fastest video'  },
+            { value: 'Qwen/Qwen3.5-2B',            label: 'Qwen 3.5 2B',    note: 'Best for OCR'   },
+            { value: 'Qwen/Qwen3-VL-4B-Instruct',  label: 'Qwen3-VL 4B',   note: ''               },
+        ],
+    },
 ];
 
 type Tab = 'keys' | 'vision' | 'alerts'
@@ -30,10 +56,19 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
     const update = (key: keyof AppSettings, value: string | number | boolean) =>
         setForm(prev => ({ ...prev, [key]: value }));
 
+    const OCR_MODEL = 'Qwen/Qwen3.5-2B'
+
     const applyTemplate = (key: PromptTemplate) => {
-        update('visionPrompt', PROMPT_TEMPLATES[key].prompt);
-        update('promptTemplate', key);
-    };
+        update('visionPrompt', PROMPT_TEMPLATES[key].prompt)
+        update('promptTemplate', key)
+        // Auto-select the OCR-optimised model for chart text reading,
+        // and restore the default recommended model when switching away.
+        if (key === 'chart_text') {
+            update('model', OCR_MODEL)
+        } else if (form.model === OCR_MODEL) {
+            update('model', 'Qwen/Qwen3.5-9B')
+        }
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -159,30 +194,39 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                                 <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted mb-3">
                                     Vision Model
                                 </h3>
-                                <div className="space-y-1.5">
-                                    {MODELS.map(m => (
-                                        <label
-                                            key={m.value}
-                                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
-                                                form.model === m.value
-                                                    ? 'border-accent/40 bg-accentDim'
-                                                    : 'border-border hover:border-muted'
-                                            }`}
-                                        >
-                                            <div className={`w-3 h-3 rounded-full border-2 shrink-0 ${
-                                                form.model === m.value ? 'border-accent bg-accent' : 'border-muted'
-                                            }`} />
-                                            <input
-                                                type="radio"
-                                                className="hidden"
-                                                name="model"
-                                                value={m.value}
-                                                checked={form.model === m.value}
-                                                onChange={() => update("model", m.value)}
-                                            />
-                                            <span className="text-sm font-mono text-text flex-1">{m.label}</span>
-                                            <span className="text-[10px] font-mono text-muted">{m.note}</span>
-                                        </label>
+                                <div className="space-y-3">
+                                    {MODEL_GROUPS.map(group => (
+                                        <div key={group.group}>
+                                            <p className="text-[10px] font-mono text-muted/60 uppercase tracking-widest mb-1.5 px-0.5">
+                                                {group.group}
+                                            </p>
+                                            <div className="space-y-1">
+                                                {group.models.map(m => (
+                                                    <label
+                                                        key={m.value}
+                                                        className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-all ${
+                                                            form.model === m.value
+                                                                ? 'border-accent/40 bg-accentDim'
+                                                                : 'border-border hover:border-muted'
+                                                        }`}
+                                                    >
+                                                        <div className={`w-3 h-3 rounded-full border-2 shrink-0 ${
+                                                            form.model === m.value ? 'border-accent bg-accent' : 'border-muted'
+                                                        }`} />
+                                                        <input
+                                                            type="radio"
+                                                            className="hidden"
+                                                            name="model"
+                                                            value={m.value}
+                                                            checked={form.model === m.value}
+                                                            onChange={() => update('model', m.value)}
+                                                        />
+                                                        <span className="text-sm font-mono text-text flex-1">{m.label}</span>
+                                                        {m.note && <span className="text-[10px] font-mono text-muted">{m.note}</span>}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -228,6 +272,32 @@ export default function SettingsPanel({ settings, onSave, onClose }: Props) {
                                     <span>1s fast</span>
                                     <span>60s slow</span>
                                 </div>
+                            </div>
+
+                            {/* Max output tokens */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-[11px] font-mono uppercase tracking-widest text-muted">
+                                        Max Output Tokens
+                                    </h3>
+                                    <span className="text-[11px] font-mono text-accent">{form.maxOutputTokens}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={50}
+                                    max={500}
+                                    step={25}
+                                    value={form.maxOutputTokens}
+                                    onChange={e => update('maxOutputTokens', Number(e.target.value))}
+                                    className="w-full accent-accent"
+                                />
+                                <div className="flex justify-between text-[10px] font-mono text-muted mt-1">
+                                    <span>50 — lowest latency</span>
+                                    <span>500 — detailed</span>
+                                </div>
+                                <p className="text-[10px] text-muted mt-1.5">
+                                    Lower = faster responses. 100–200 works well for scalping; 300–500 for swing/pattern analysis.
+                                </p>
                             </div>
                         </div>
                     )}

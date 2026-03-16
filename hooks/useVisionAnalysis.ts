@@ -180,6 +180,7 @@ export function useVisionAnalysis() {
                 prompt,
                 source: { type: 'screen' },
                 mode: settings.processingMode,
+                maxOutputTokens: settings.maxOutputTokens,
                 ...frameConfig,
                 onResult: (raw: { ok: boolean; result: string; error: string | null }) => {
                     if (!raw.ok) {

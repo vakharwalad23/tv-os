@@ -93,6 +93,25 @@ FORMAT: [PATTERN NAME] at ~$PRICE — bullish/bearish implication — confidence
 
 Only report patterns that are COMPLETE or nearly complete. Do not speculate.`,
     },
+    chart_text: {
+        label: '🔤 Read Chart Text',
+        prompt: `You are an OCR specialist reading text from a live trading chart.
+
+Extract and report ALL visible text including:
+- Current price, bid/ask, last trade
+- Ticker symbol and asset name
+- Indicator values (RSI, MACD, EMA, Bollinger, ATR, etc.) with their exact numbers
+- Volume figures
+- Price levels on Y-axis
+- Time labels on X-axis
+- Any on-screen alerts, labels, or annotations
+
+Format each item as:
+[FIELD]: VALUE
+
+Report every piece of text you can read. If a value is partially obscured, prefix it with (~).
+Do not interpret or analyse — only transcribe what is visible.`,
+    },
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -102,6 +121,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     model: 'Qwen/Qwen3.5-9B',
     processingMode: 'frame',
     analysisFrequency: 5,
+    maxOutputTokens: 200,
     audioAlertsEnabled: true,
     alertKeywords: 'BREAKOUT,BREAKDOWN,REVERSAL,ALERT,ENGULFING,DIVERGENCE',
     promptTemplate: 'default',
