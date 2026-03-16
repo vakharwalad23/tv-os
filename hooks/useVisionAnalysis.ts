@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { VisionResult, AppSettings, StreamStatus, SessionStats, SignalTimelineEntry } from '@/lib/types'
 import { appendSignalLog } from '@/lib/storage'
 
@@ -100,12 +100,23 @@ export function useVisionAnalysis() {
         timeline: [],
     })
 
+    // Pre-warm the overshoot module so the dynamic import is already cached
+    // when the user clicks start, keeping getDisplayMedia inside the gesture chain.
+    useEffect(() => {
+        import('overshoot').catch(() => {})
+    }, [])
+
     const visionRef = useRef<unknown>(null)
     const resultCountRef = useRef(0)
     const fpsTimerRef = useRef<NodeJS.Timeout | null>(null)
     const lastFpsCountRef = useRef(0)
     const settingsRef = useRef<AppSettings | null>(null)
     const streakRef = useRef<{ color: 'GREEN' | 'RED'; count: number } | null>(null)
+    // Gate for slow timeframes: tracks when we last forwarded a result.
+    // The SDK is capped at 60s, so for 15m/1H/4H/1D we suppress callbacks
+    // until the real desired interval has elapsed.
+    const lastProcessedAtRef = useRef<number>(0)
+    const analysisFreqRef = useRef<number>(60)
 
     // Request notification permission
     const requestNotificationPermission = useCallback(async () => {
@@ -151,9 +162,17 @@ export function useVisionAnalysis() {
                 : ''
             const prompt = timeframePrefix + settings.visionPrompt
 
+            // The SDK enforces a hard max of 60s. For slower timeframes we run the
+            // SDK at 60s but gate onResult so results only pass through once the
+            // real desired interval has elapsed (e.g. every ~2 ticks for 15m,
+            // every ~5 ticks for 1H, etc.).
+            const sdkFreq = Math.min(analysisFreq, 60)
+            analysisFreqRef.current = analysisFreq
+            lastProcessedAtRef.current = 0  // fire immediately on first result
+
             const frameConfig = settings.processingMode === 'frame'
-                ? { frameProcessing: { interval_seconds: analysisFreq } }
-                : { clipProcessing: { clip_length_seconds: analysisFreq, delay_seconds: analysisFreq, target_fps: 6 } }
+                ? { frameProcessing: { interval_seconds: sdkFreq } }
+                : { clipProcessing: { clip_length_seconds: sdkFreq, delay_seconds: sdkFreq, target_fps: 6 } }
 
             const vision = new RealtimeVision({
                 apiKey: settings.overshootApiKey,
@@ -168,9 +187,15 @@ export function useVisionAnalysis() {
                         return
                     }
 
+                    // Gate: suppress this result if the real timeframe interval hasn't elapsed yet
+                    const nowMs = Date.now()
+                    const elapsed = (nowMs - lastProcessedAtRef.current) / 1000
+                    if (lastProcessedAtRef.current !== 0 && elapsed < analysisFreqRef.current) return
+                    lastProcessedAtRef.current = nowMs
+
                     resultCountRef.current += 1
                     const parsed = parseResult(raw.result)
-                    const now = new Date()
+                    const now = new Date(nowMs)
 
                     const result: VisionResult = {
                         id: crypto.randomUUID(),
@@ -317,6 +342,7 @@ export function useVisionAnalysis() {
         }
         if (fpsTimerRef.current) clearInterval(fpsTimerRef.current)
         streakRef.current = null
+        lastProcessedAtRef.current = 0
         setState(prev => ({
             ...prev,
             isRunning: false,
